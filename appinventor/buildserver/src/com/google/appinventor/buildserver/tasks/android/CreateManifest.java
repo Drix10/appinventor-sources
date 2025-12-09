@@ -38,6 +38,16 @@ import java.util.Set;
 public class CreateManifest implements AndroidTask {
   private static final String NEARFIELD_COMPONENT =
       "com.google.appinventor.components.runtime.NearField";
+  
+  // Permission constants
+  private static final String PERMISSION_WRITE_EXTERNAL_STORAGE =
+      "android.permission.WRITE_EXTERNAL_STORAGE";
+  private static final String PERMISSION_READ_EXTERNAL_STORAGE =
+      "android.permission.READ_EXTERNAL_STORAGE";
+  
+  // SDK version constants for permission constraints
+  private static final int SDK_Q = 29;  // Android 10 (Q)
+  private static final int SDK_TIRAMISU = 33;  // Android 13 (Tiramisu)
 
   @Override
   public TaskResult execute(AndroidCompilerContext context) {
@@ -171,23 +181,38 @@ public class CreateManifest implements AndroidTask {
         }
       }
 
-      for (String permission : permissions) {
-        if ("android.permission.WRITE_EXTERNAL_STORAGE".equals(permission)) {
-          out.write("  <uses-permission android:name=\"" + permission + "\"");
-
-          // we don't need these permissions post KitKat, but we do need them for the companion
-          if (!context.isForCompanion() && !context.usesLegacyFileAccess() && minSdk < 29) {
-            out.write(" android:maxSdkVersion=\"29\"");
-          }
-
-        } else {
-          out.write("  <uses-permission android:name=\""
-              // replace %packageName% with the actual packageName
-              + permission.replace("%packageName%", packageName)
-              + "\"");
+      // Add system-level permission constraints before processing.
+      // These constraints are properly merged with extension-provided constraints using
+      // MaxReducer (which takes the maximum value), preventing duplicate maxSdkVersion
+      // attributes in the manifest XML. (Issue #3650)
+      
+      // WRITE_EXTERNAL_STORAGE: Not needed post Android 10 (SDK 29), except for companion
+      // and legacy file access
+      if (permissions.contains(PERMISSION_WRITE_EXTERNAL_STORAGE)) {
+        if (shouldAddMaxSdkConstraint(context, minSdk, SDK_Q)) {
+          permissionConstraints.put(PERMISSION_WRITE_EXTERNAL_STORAGE,
+              new PermissionConstraint<>(PERMISSION_WRITE_EXTERNAL_STORAGE,
+                  "maxSdkVersion", SDK_Q));
         }
+      }
+      
+      // READ_EXTERNAL_STORAGE: Not needed post Android 13 (SDK 33), except for companion
+      // and legacy file access
+      if (permissions.contains(PERMISSION_READ_EXTERNAL_STORAGE)) {
+        if (shouldAddMaxSdkConstraint(context, minSdk, SDK_TIRAMISU)) {
+          permissionConstraints.put(PERMISSION_READ_EXTERNAL_STORAGE,
+              new PermissionConstraint<>(PERMISSION_READ_EXTERNAL_STORAGE,
+                  "maxSdkVersion", SDK_TIRAMISU));
+        }
+      }
+
+      for (String permission : permissions) {
+        out.write("  <uses-permission android:name=\""
+            // replace %packageName% with the actual packageName
+            + permission.replace("%packageName%", packageName)
+            + "\"");
         outputPermissionConstraints(out, permissionConstraints, permission);
-        out.write(" />");
+        out.write(" />\n");
       }
 
       if (context.isForCompanion()) {
@@ -436,11 +461,27 @@ public class CreateManifest implements AndroidTask {
     return TaskResult.generateSuccess();
   }
 
+  /**
+   * Determines if a maxSdkVersion constraint should be added for a permission.
+   * 
+   * @param context the build context
+   * @param minSdk the minimum SDK version of the app
+   * @param maxSdk the maximum SDK version for the constraint
+   * @return true if the constraint should be added
+   */
+  private boolean shouldAddMaxSdkConstraint(AndroidCompilerContext context, int minSdk,
+      int maxSdk) {
+    // Don't add constraint for companion apps (they need full access)
+    // Don't add constraint for legacy file access (needs full access)
+    // Don't add constraint if minSdk already exceeds the maxSdk (permission not needed)
+    return !context.isForCompanion() && !context.usesLegacyFileAccess() && minSdk < maxSdk;
+  }
+
   private void outputPermissionConstraints(Writer out,
       Multimap<String, PermissionConstraint<?>> permissionConstraints, String permission)
       throws IOException {
     Collection<PermissionConstraint<?>> constraints = permissionConstraints.get(permission);
-    if (constraints == null) {
+    if (constraints == null || constraints.isEmpty()) {
       return;
     }
 
@@ -452,23 +493,42 @@ public class CreateManifest implements AndroidTask {
     for (Map.Entry<String, Collection<PermissionConstraint<?>>> entry :
         aggregates.asMap().entrySet()) {
       String attribute = entry.getKey();
-      // TODO(ewpatton): Figure out a more generic way of doing this.
       String value;
-      if ("maxSdkVersion".equals(attribute)) {
-        PermissionConstraint.Reducer<Integer> reducer = new PermissionConstraint.MaxReducer();
-        for (PermissionConstraint<?> constraint : entry.getValue()) {
-          constraint.as(Integer.class).apply(reducer);
+      
+      try {
+        if ("maxSdkVersion".equals(attribute)) {
+          PermissionConstraint.Reducer<Integer> reducer = new PermissionConstraint.MaxReducer();
+          for (PermissionConstraint<?> constraint : entry.getValue()) {
+            constraint.as(Integer.class).apply(reducer);
+          }
+          int maxSdkValue = ((PermissionConstraint.MaxReducer) reducer).getResult();
+          
+          // Validate maxSdkVersion value
+          if (maxSdkValue < 0) {
+            throw new IllegalArgumentException(
+                "Invalid maxSdkVersion value: " + maxSdkValue + " for permission: " + permission
+                + ". maxSdkVersion must be non-negative.");
+          }
+          
+          value = reducer.toString();
+        } else if ("usesPermissionFlags".equals(attribute)) {
+          PermissionConstraint.Reducer<String> reducer = new PermissionConstraint.UnionReducer<>();
+          for (PermissionConstraint<?> constraint : entry.getValue()) {
+            constraint.as(String.class).apply(reducer);
+          }
+          value = reducer.toString();
+        } else {
+          throw new IllegalArgumentException(
+              "Unrecognized permission constraint attribute: " + attribute
+              + " for permission: " + permission);
         }
-        value = reducer.toString();
-      } else if ("usesPermissionFlags".equals(attribute)) {
-        PermissionConstraint.Reducer<String> reducer = new PermissionConstraint.UnionReducer<>();
-        for (PermissionConstraint<?> constraint : entry.getValue()) {
-          constraint.as(String.class).apply(reducer);
-        }
-        value = reducer.toString();
-      } else {
-        throw new IllegalArgumentException("Unrecognized permission constraint: " + attribute);
+      } catch (ClassCastException e) {
+        throw new IllegalArgumentException(
+            "Invalid type for permission constraint attribute: " + attribute
+            + " for permission: " + permission
+            + ". Expected " + ("maxSdkVersion".equals(attribute) ? "Integer" : "String"), e);
       }
+      
       out.write(" android:" + attribute + "=\"" + value + "\"");
     }
   }
