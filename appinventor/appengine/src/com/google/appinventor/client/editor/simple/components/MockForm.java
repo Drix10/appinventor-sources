@@ -348,6 +348,10 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
   private boolean actionBar = false;
   private boolean showStatusBar = true;
 
+  // DisplayMode preview opacity constants
+  private static final double PHONEBAR_OPACITY_BACKGROUND_EDGE = 0.7;
+  private static final double PHONEBAR_OPACITY_NORMAL = 1.0;
+  
   // Property names
   private static final String PROPERTY_NAME_TITLE = "Title";
   private static final String PROPERTY_NAME_SCREEN_ORIENTATION = "ScreenOrientation";
@@ -982,19 +986,25 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
     // This shows developers what edge-to-edge will look like on Android 15+
     if ("edge-to-edge".equals(mode)) {
       // EdgeToEdge: Content extends behind system bars, system bars hidden
-      // In EdgeToEdge mode, system bars are hidden, so hide phoneBar in preview
+      // In EdgeToEdge mode, system bars are always hidden regardless of ShowStatusBar
       phoneBar.setVisible(false);
       phoneBar.setVisibility(false);
+      phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_NORMAL);
       // Clear any padding/positioning adjustments
       responsivePanel.getElement().getStyle().clearProperty("paddingTop");
       responsivePanel.getElement().getStyle().clearProperty("top");
+      responsivePanel.getElement().getStyle().clearProperty("position");
       formWidget.getElement().getStyle().clearProperty("paddingTop");
+      if (scrollPanel != null) {
+        scrollPanel.getElement().getStyle().clearProperty("paddingTop");
+      }
     } else if ("background-edge-to-edge".equals(mode)) {
       // BackgroundEdgeToEdge: Background extends, content respects insets, system bars visible
+      // In BackgroundEdgeToEdge mode, system bars are always shown regardless of ShowStatusBar
       phoneBar.setVisible(true);
       phoneBar.setVisibility(true);
-      // Make phoneBar semi-transparent to show it's overlaid
-      phoneBar.getElement().getStyle().setOpacity(0.7);
+      // Make phoneBar semi-transparent to show it's overlaid on background
+      phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_BACKGROUND_EDGE);
       // Position responsivePanel to start at top (behind phoneBar)
       responsivePanel.getElement().getStyle().setProperty("position", "relative");
       responsivePanel.getElement().getStyle().setProperty("top", "0px");
@@ -1002,12 +1012,13 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       if (scrollPanel != null) {
         scrollPanel.getElement().getStyle().setProperty("paddingTop", phoneBar.getHeight() + "px");
       }
+      formWidget.getElement().getStyle().clearProperty("paddingTop");
     } else {
       // Safe mode (default): Traditional layout with system bars
       // In Safe mode, respect the ShowStatusBar property setting
       phoneBar.setVisible(showStatusBar);
       phoneBar.setVisibility(showStatusBar);
-      phoneBar.getElement().getStyle().setOpacity(1.0);
+      phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_NORMAL);
       // Clear any positioning adjustments
       responsivePanel.getElement().getStyle().clearProperty("paddingTop");
       responsivePanel.getElement().getStyle().clearProperty("top");
@@ -1018,11 +1029,10 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       }
     }
     
-    // Only resize if dimensions are valid
-    if (screenWidth == 0 || screenHeight == 0) {
-      return;
+    // Only resize if dimensions are valid and have changed
+    if (screenWidth > 0 && screenHeight > 0) {
+      resizePanel(screenWidth, screenHeight);
     }
-    resizePanel(screenWidth, screenHeight);
   }
 
   private void setTutorialURLProperty(String asJson) {

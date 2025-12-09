@@ -1548,16 +1548,23 @@ public class Form extends AppInventorCompatActivity
   @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_BOOLEAN,
       defaultValue = "True")
   @SimpleProperty(category = PropertyCategory.APPEARANCE)
-  public void ShowStatusBar(boolean show) {
+  public synchronized void ShowStatusBar(boolean show) {
     if (show != showStatusBar) {
-      if (show) {
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-      } else {
-        getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-        getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
-      }
       showStatusBar = show;
+      // On Android 15+, re-apply display mode to ensure consistency
+      // DisplayMode takes precedence and will handle status bar visibility
+      if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+        applyDisplayMode(displayMode);
+      } else {
+        // Legacy behavior for pre-Android 15 devices
+        if (show) {
+          getWindow().addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+          getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        } else {
+          getWindow().addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+          getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+        }
+      }
     }
   }
 

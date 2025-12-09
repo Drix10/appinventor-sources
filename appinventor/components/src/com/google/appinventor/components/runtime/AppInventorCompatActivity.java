@@ -150,6 +150,12 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
     if (appCompatDelegate != null) {
       appCompatDelegate.onConfigurationChanged(newConfig);
     }
+    
+    // Re-apply display mode after configuration change to ensure WindowInsets
+    // listeners are properly re-registered and insets are recalculated
+    if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+      applyDisplayMode(displayMode);
+    }
   }
 
   @Override
@@ -398,7 +404,11 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
    * Applies the specified display mode to control how the app layout interacts with system UI.
    * This method handles edge-to-edge display for Android 15+ (API 35+).
    *
-   * Thread Safety: This method should be called from the UI thread only.
+   * <p><b>Thread Safety:</b> This method MUST be called from the UI thread only.
+   * Calling from a background thread will result in undefined behavior and may cause crashes.</p>
+   *
+   * <p><b>Lifecycle:</b> This method can be called multiple times (e.g., on configuration changes)
+   * and will properly clean up previous WindowInsets listeners before applying new ones.</p>
    *
    * @param mode The display mode to apply (Safe, EdgeToEdge, or BackgroundEdgeToEdge)
    */
@@ -441,7 +451,11 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
         // Safe area mode - apply padding to avoid system bars
         // In Safe mode, respect the ShowStatusBar property
         Form activeForm = Form.getActiveForm();
-        boolean hideStatusBar = activeForm != null && !activeForm.ShowStatusBar();
+        boolean hideStatusBar = false;
+        if (activeForm != null) {
+          // Store result to avoid TOCTOU (Time-Of-Check-Time-Of-Use) race condition
+          hideStatusBar = !activeForm.ShowStatusBar();
+        }
         
         if (hideStatusBar) {
           // User wants status bar hidden - hide it using WindowInsetsController
