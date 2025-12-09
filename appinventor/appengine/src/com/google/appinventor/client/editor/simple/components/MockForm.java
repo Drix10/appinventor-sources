@@ -359,6 +359,7 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
   private static final String PROPERTY_NAME_SIZING = "Sizing"; // Don't show except on screen1
   private static final String PROPERTY_NAME_TITLEVISIBLE = "TitleVisible";
   private static final String PROPERTY_NAME_SHOW_STATUS_BAR = "ShowStatusBar";
+  private static final String PROPERTY_NAME_DISPLAY_MODE = "DisplayMode";
   // Don't show except on screen1
   private static final String PROPERTY_NAME_SHOW_LISTS_AS_JSON = "ShowListsAsJson";
   private static final String PROPERTY_NAME_TUTORIAL_URL = "TutorialURL";
@@ -970,6 +971,60 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
     resizePanel(screenWidth,screenHeight); // update the MockForm size
   }
 
+  private void setDisplayModeProperty(String mode) {
+    // Null safety checks - phoneBar and formWidget might not be initialized yet
+    if (phoneBar == null || formWidget == null || responsivePanel == null) {
+      LOG.warning("MockForm: phoneBar, formWidget, or responsivePanel is null, cannot apply DisplayMode preview");
+      return;
+    }
+    
+    // Visual feedback for DisplayMode in designer preview
+    // This shows developers what edge-to-edge will look like on Android 15+
+    if ("edge-to-edge".equals(mode)) {
+      // EdgeToEdge: Content extends behind system bars, system bars hidden
+      // In EdgeToEdge mode, system bars are hidden, so hide phoneBar in preview
+      phoneBar.setVisible(false);
+      phoneBar.setVisibility(false);
+      // Clear any padding/positioning adjustments
+      responsivePanel.getElement().getStyle().clearProperty("paddingTop");
+      responsivePanel.getElement().getStyle().clearProperty("top");
+      formWidget.getElement().getStyle().clearProperty("paddingTop");
+    } else if ("background-edge-to-edge".equals(mode)) {
+      // BackgroundEdgeToEdge: Background extends, content respects insets, system bars visible
+      phoneBar.setVisible(true);
+      phoneBar.setVisibility(true);
+      // Make phoneBar semi-transparent to show it's overlaid
+      phoneBar.getElement().getStyle().setOpacity(0.7);
+      // Position responsivePanel to start at top (behind phoneBar)
+      responsivePanel.getElement().getStyle().setProperty("position", "relative");
+      responsivePanel.getElement().getStyle().setProperty("top", "0px");
+      // But add padding to scrollPanel to keep content below phoneBar
+      if (scrollPanel != null) {
+        scrollPanel.getElement().getStyle().setProperty("paddingTop", phoneBar.getHeight() + "px");
+      }
+    } else {
+      // Safe mode (default): Traditional layout with system bars
+      // In Safe mode, respect the ShowStatusBar property setting
+      phoneBar.setVisible(showStatusBar);
+      phoneBar.setVisibility(showStatusBar);
+      phoneBar.getElement().getStyle().setOpacity(1.0);
+      // Clear any positioning adjustments
+      responsivePanel.getElement().getStyle().clearProperty("paddingTop");
+      responsivePanel.getElement().getStyle().clearProperty("top");
+      responsivePanel.getElement().getStyle().clearProperty("position");
+      formWidget.getElement().getStyle().clearProperty("paddingTop");
+      if (scrollPanel != null) {
+        scrollPanel.getElement().getStyle().clearProperty("paddingTop");
+      }
+    }
+    
+    // Only resize if dimensions are valid
+    if (screenWidth == 0 || screenHeight == 0) {
+      return;
+    }
+    resizePanel(screenWidth, screenHeight);
+  }
+
   private void setTutorialURLProperty(String asJson) {
     // This property actually applies to the application and is only visible on
     // Screen1. When we load a form that is not Screen1, this method will be called with the
@@ -1324,6 +1379,8 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       setShowListsAsJsonProperty(newValue);
     } else if (propertyName.equals(PROPERTY_NAME_SHOW_STATUS_BAR)) {
       setShowStatusBarProperty(newValue);
+    } else if (propertyName.equals(PROPERTY_NAME_DISPLAY_MODE)) {
+      setDisplayModeProperty(newValue);
     } else if (propertyName.equals(PROPERTY_NAME_TUTORIAL_URL)) {
       setTutorialURLProperty(newValue);
     } else if (propertyName.equals(PROPERTY_NAME_BLOCK_SUBSET)) {

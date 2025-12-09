@@ -431,10 +431,32 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
 
     // Clear any existing WindowInsets listener to prevent memory leaks
     ViewCompat.setOnApplyWindowInsetsListener(decorView, null);
+    
+    // Get WindowInsetsController for controlling system bar visibility
+    androidx.core.view.WindowInsetsControllerCompat insetsController = 
+        androidx.core.view.WindowCompat.getInsetsController(window, decorView);
 
     switch (mode) {
       case Safe:
         // Safe area mode - apply padding to avoid system bars
+        // In Safe mode, respect the ShowStatusBar property
+        Form activeForm = Form.getActiveForm();
+        boolean hideStatusBar = activeForm != null && !activeForm.ShowStatusBar();
+        
+        if (hideStatusBar) {
+          // User wants status bar hidden - hide it using WindowInsetsController
+          if (insetsController != null) {
+            insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars());
+            insetsController.setSystemBarsBehavior(
+                androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+          }
+        } else {
+          // Show status bar
+          if (insetsController != null) {
+            insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars());
+          }
+        }
+        
         // Use manual inset handling for consistency with other modes and explicit control
         WindowCompat.setDecorFitsSystemWindows(window, false);
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
@@ -457,6 +479,13 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
 
       case EdgeToEdge:
         // Edge-to-edge mode - layout extends under system bars
+        // In EdgeToEdge mode, hide system bars regardless of ShowStatusBar property
+        if (insetsController != null) {
+          insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+          insetsController.setSystemBarsBehavior(
+              androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        }
+        
         WindowCompat.setDecorFitsSystemWindows(window, false);
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
           if (windowInsets == null) {
@@ -478,6 +507,11 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
 
       case BackgroundEdgeToEdge:
         // Hybrid mode - background extends edge-to-edge, but content respects safe area
+        // Show system bars but allow layout behind them
+        if (insetsController != null) {
+          insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+        }
+        
         WindowCompat.setDecorFitsSystemWindows(window, false);
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
           if (windowInsets == null) {

@@ -42,12 +42,14 @@ public enum DisplayMode implements OptionList<String> {
     return value;
   }
 
-  private static final Map<String, DisplayMode> lookup = new HashMap<>();
+  private static final Map<String, DisplayMode> lookup;
 
   static {
+    Map<String, DisplayMode> tempMap = new HashMap<>();
     for (DisplayMode mode : DisplayMode.values()) {
-      lookup.put(mode.toUnderlyingValue().toLowerCase(), mode);
+      tempMap.put(mode.toUnderlyingValue().toLowerCase(), mode);
     }
+    lookup = java.util.Collections.unmodifiableMap(tempMap);
   }
 
   public static DisplayMode fromUnderlyingValue(String mode) {
