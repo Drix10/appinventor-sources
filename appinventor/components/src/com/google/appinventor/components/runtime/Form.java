@@ -1526,7 +1526,8 @@ public class Form extends AppInventorCompatActivity
   @SimpleProperty(category = PropertyCategory.APPEARANCE,
       description = "The status bar is the topmost bar on the screen. This property reports whether the status bar is visible. " +
       "Note: On Android 15+, the DisplayMode property provides more comprehensive control over screen layout. " +
-      "ShowStatusBar works independently and can be used alongside DisplayMode.")
+      "ShowStatusBar works alongside DisplayMode: in Safe mode it controls status bar visibility, " +
+      "but in EdgeToEdge and BackgroundEdgeToEdge modes, DisplayMode takes precedence.")
   public boolean ShowStatusBar() {
     return showStatusBar;
   }
@@ -1537,7 +1538,10 @@ public class Form extends AppInventorCompatActivity
    *
    * Note: On Android 15+, the DisplayMode property provides more comprehensive control over
    * screen layout including status bar, navigation bar, and cutouts. ShowStatusBar works
-   * independently and can be used alongside DisplayMode for backward compatibility.
+   * alongside DisplayMode:
+   * - In Safe mode: ShowStatusBar controls status bar visibility
+   * - In EdgeToEdge mode: Status bar is always hidden (ShowStatusBar has no effect)
+   * - In BackgroundEdgeToEdge mode: Status bar is always shown (ShowStatusBar has no effect)
    *
    * @param show boolean
    */
@@ -1796,8 +1800,15 @@ public class Form extends AppInventorCompatActivity
       // Safe mode (default): Normal layout with system UI visible
       window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
       window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
-      window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
-      window.addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+      
+      // Respect the ShowStatusBar property setting
+      if (showStatusBar) {
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        window.addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+      } else {
+        window.addFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+      }
       
       // Clear all system UI visibility flags
       systemUiVisibility &= ~(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
@@ -1808,7 +1819,8 @@ public class Form extends AppInventorCompatActivity
       
       decorView.setSystemUiVisibility(systemUiVisibility);
       
-      Log.d(LOG_TAG, "Safe display mode applied (API " + Build.VERSION.SDK_INT + ")");
+      Log.d(LOG_TAG, "Safe display mode applied (API " + Build.VERSION.SDK_INT + 
+          ", ShowStatusBar=" + showStatusBar + ")");
     }
   }
 

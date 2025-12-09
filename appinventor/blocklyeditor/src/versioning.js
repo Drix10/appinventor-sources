@@ -128,14 +128,14 @@ Blockly.Versioning.upgrade = function (
     }
     Blockly.Versioning.log(
       "In Blockly.Versioning.upgrade, upgradeComponentType(" +
-        componentType +
-        "," +
-        preUpgradeVersion +
-        "," +
-        systemVersion +
-        "," +
-        rep +
-        ")"
+      componentType +
+      "," +
+      preUpgradeVersion +
+      "," +
+      systemVersion +
+      "," +
+      rep +
+      ")"
     );
     if (preUpgradeVersion > systemVersion) {
       // What to do in this case? Currently, throw an exception, but might want to do something else:
@@ -150,11 +150,11 @@ Blockly.Versioning.upgrade = function (
       // Need to upgrade this component
       Blockly.Versioning.log(
         "upgrading component type " +
-          componentType +
-          " from version " +
-          preUpgradeVersion +
-          " to version " +
-          systemVersion
+        componentType +
+        " from version " +
+        preUpgradeVersion +
+        " to version " +
+        systemVersion
       );
       var upgradeMap = Blockly.Versioning.AllUpgradeMaps[componentType];
       if (!upgradeMap) {
@@ -180,11 +180,11 @@ Blockly.Versioning.upgrade = function (
         // Perform upgrade
         Blockly.Versioning.log(
           "applying upgrader for upgrading component type " +
-            componentType +
-            " from version " +
-            (version - 1) +
-            " to version " +
-            version
+          componentType +
+          " from version " +
+          (version - 1) +
+          " to version " +
+          version
         );
         // Apply upgrader, possibly mutating rep and changing its dynamic type.
         rep = Blockly.Versioning.applyUpgrader(
@@ -688,8 +688,8 @@ Blockly.Versioning.v17_blocksOverhaul = function (xmlFromFile, workspace) {
               if (componentType == instance && renameAlert === 0) {
                 alert(
                   "Your app was created in an earlier version of App Inventor and may be loaded incorrectly." +
-                    " The problem is that it names a component instance" +
-                    " the same as the component type, which is longer allowed."
+                  " The problem is that it names a component instance" +
+                  " the same as the component type, which is longer allowed."
                 );
                 renameAlert = 1;
               }
@@ -1121,11 +1121,11 @@ Blockly.Versioning.addDefaultMethodArgument = function (
               // Don't replace an existing block, but use console.log to report this situation.
               console.log(
                 "Already a child block at index  " +
-                  argumentIndex +
-                  " in Blockly.Versioning.addDefaultMethodArgument(" +
-                  componentType +
-                  ", " +
-                  methodName,
+                argumentIndex +
+                " in Blockly.Versioning.addDefaultMethodArgument(" +
+                componentType +
+                ", " +
+                methodName,
                 +", " + argumentIndex,
                 +", " + defaultXMLArgumentBlockText + ")"
               );
@@ -1844,7 +1844,7 @@ Blockly.Versioning.xmlBlockTextToDom = function (xmlBlockText) {
   var children = goog.dom.getChildren(topLevelDom);
   if (children.length != 1) {
     throw (
-      "Unexpected number of childred in Blockly.Versioning.xmlBlockTextToDom: " +
+      "Unexpected number of children in Blockly.Versioning.xmlBlockTextToDom: " +
       children.length
     );
   } else {
@@ -2175,8 +2175,8 @@ Blockly.Versioning.AllUpgradeMaps = {
       "DrawCircle",
       3, // Since this will be ARG3
       '<block type="logic_boolean">' +
-        '  <field name="BOOL">TRUE</field>' +
-        "</block>"
+      '  <field name="BOOL">TRUE</field>' +
+      "</block>"
     ),
 
     // AI2: No blocks need to be modified to upgrade to version 10
@@ -2255,16 +2255,16 @@ Blockly.Versioning.AllUpgradeMaps = {
         "FormatDateTime",
         1,
         '<block type="text">' +
-          '  <field name="TEXT">MMM d, yyyy HH:mm:ss a</field>' +
-          "</block>"
+        '  <field name="TEXT">MMM d, yyyy HH:mm:ss a</field>' +
+        "</block>"
       ),
       Blockly.Versioning.addDefaultMethodArgument(
         "Clock",
         "FormatDate",
         1,
         '<block type="text">' +
-          '  <field name="TEXT">MMM d, yyyy</field>' +
-          "</block>"
+        '  <field name="TEXT">MMM d, yyyy</field>' +
+        "</block>"
       ),
     ],
 

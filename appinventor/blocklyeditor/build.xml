@@ -202,11 +202,23 @@
 				<jvmarg value="-Dfile.encoding=UTF-8"/>
 				<jvmarg value="-Djava.awt.headless=true"/>
 			</java>
-			<exec executable="node_modules/.bin/karma.cmd" dir="${appinventor.dir}" failonerror="true" osfamily="windows">
+			
+			<!-- Set platform property based on OS family -->
+			<condition property="is.windows">
+				<os family="windows"/>
+			</condition>
+			<condition property="is.unix">
+				<os family="unix"/>
+			</condition>
+			
+			<!-- Windows: Run karma.cmd -->
+			<exec executable="node_modules/.bin/karma.cmd" dir="${appinventor.dir}" failonerror="true" if:set="is.windows">
 				<arg value="start"/>
 				<arg value="--single-run"/>
 			</exec>
-			<exec executable="node_modules/.bin/karma" dir="${appinventor.dir}" failonerror="true" osfamily="unix">
+			
+			<!-- Unix/Linux/macOS: Run karma -->
+			<exec executable="node_modules/.bin/karma" dir="${appinventor.dir}" failonerror="true" unless:set="is.windows">
 				<arg value="start"/>
 				<arg value="--single-run"/>
 			</exec>
