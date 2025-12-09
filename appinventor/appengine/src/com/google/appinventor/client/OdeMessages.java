@@ -1565,6 +1565,20 @@ public interface OdeMessages extends Messages, ComponentTranslations {
   @Description("Text for screen orientation choice 'User '")
   String userScreenOrientation();
 
+  // Used in editor/youngandroid/properties/YoungAndroidDisplayModeChoicePropertyEditor.java
+
+  @DefaultMessage("Safe")
+  @Description("Text for display mode choice 'Safe' - layout respects system UI boundaries")
+  String safeDisplayMode();
+
+  @DefaultMessage("Edge to Edge")
+  @Description("Text for display mode choice 'Edge to Edge' - layout extends under system UI")
+  String edgeToEdgeDisplayMode();
+
+  @DefaultMessage("Background Edge to Edge")
+  @Description("Text for display mode choice 'Background Edge to Edge' - background extends under system UI while components stay in safe area")
+  String backgroundEdgeToEdgeDisplayMode();
+
   // Used in editor/youngandroid/properties/YoungAndroidToastLengthChoicePropertyEditor.java
 
   @DefaultMessage("Short")

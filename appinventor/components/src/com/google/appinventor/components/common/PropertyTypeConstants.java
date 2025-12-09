@@ -238,6 +238,12 @@ public class PropertyTypeConstants {
    */
   public static final String PROPERTY_TYPE_SCREEN_ANIMATION = "screen_animation";
 
+  /**
+   * Choices of display modes for controlling how the screen layout interacts with system UI.
+   * Options include safe area mode, edge-to-edge mode, and hybrid mode.
+   */
+  public static final String PROPERTY_TYPE_DISPLAY_MODE = "display_mode";
+
    /**
     * Minimum distance interval, in meters, that the location sensor will try to use
     * for sending out location updates. See {@link com.google.appinventor.components.runtime.LocationSensor}.

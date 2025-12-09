@@ -43,6 +43,7 @@ import android.view.MenuItem.OnMenuItemClickListener;
 import android.view.View;
 import android.view.ViewGroup;
 import android.view.ViewTreeObserver.OnGlobalLayoutListener;
+import android.view.WindowInsets;
 import android.view.WindowManager;
 import android.view.inputmethod.InputMethodManager;
 import android.widget.FrameLayout;
@@ -51,6 +52,7 @@ import androidx.annotation.NonNull;
 import androidx.annotation.VisibleForTesting;
 import androidx.core.app.ActivityCompat;
 import androidx.core.content.ContextCompat;
+import androidx.core.view.WindowInsetsControllerCompat;
 
 import com.google.appinventor.components.annotations.Asset;
 import com.google.appinventor.components.annotations.DesignerComponent;
@@ -65,6 +67,7 @@ import com.google.appinventor.components.annotations.SimpleProperty;
 import com.google.appinventor.components.annotations.UsesPermissions;
 import com.google.appinventor.components.common.ComponentCategory;
 import com.google.appinventor.components.common.ComponentConstants;
+import com.google.appinventor.components.common.DisplayMode;
 import com.google.appinventor.components.common.FileScope;
 import com.google.appinventor.components.common.HorizontalAlignment;
 import com.google.appinventor.components.common.Permission;
@@ -191,6 +194,7 @@ public class Form extends AppInventorCompatActivity
   private boolean showStatusBar = true;
   private boolean showTitle = true;
   protected String title = "";
+  private volatile DisplayMode displayMode = DisplayMode.Safe;
 
   private String backgroundImagePath = "";
   private Drawable backgroundDrawable;
@@ -431,6 +435,12 @@ public class Form extends AppInventorCompatActivity
     // Add application components to the form
     $define();
 
+    // Apply DisplayMode after components are defined and window is ready
+    // This ensures the window and decorView are fully initialized
+    if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+      applyDisplayMode(displayMode);
+    }
+
     // Special case for Event.Initialize(): all other initialize events are triggered after
     // completing the constructor. This doesn't work for Android apps though because this method
     // is called after the constructor completes and therefore the Initialize event would run
@@ -468,6 +478,8 @@ public class Form extends AppInventorCompatActivity
     AlignVertical(ComponentConstants.GRAVITY_TOP);
     Title("");
     ShowStatusBar(true);
+    // Note: DisplayMode is NOT set here to avoid applying it before window is ready
+    // It will be applied in onCreateFinish() after $define()
     TitleVisible(true);
     ShowListsAsJson(true);  // Note: Only the Screen1 value is used as this is per-project
     ActionBar(false);
@@ -1512,7 +1524,9 @@ public class Form extends AppInventorCompatActivity
    * @return  showStatusBar boolean
    */
   @SimpleProperty(category = PropertyCategory.APPEARANCE,
-      description = "The status bar is the topmost bar on the screen. This property reports whether the status bar is visible.")
+      description = "The status bar is the topmost bar on the screen. This property reports whether the status bar is visible. " +
+      "Note: On Android 15+, the DisplayMode property provides more comprehensive control over screen layout. " +
+      "ShowStatusBar works independently and can be used alongside DisplayMode.")
   public boolean ShowStatusBar() {
     return showStatusBar;
   }
@@ -1520,6 +1534,10 @@ public class Form extends AppInventorCompatActivity
   /**
    * The status bar is the topmost bar on the screen. This property reports whether the status bar
    * is visible.
+   *
+   * Note: On Android 15+, the DisplayMode property provides more comprehensive control over
+   * screen layout including status bar, navigation bar, and cutouts. ShowStatusBar works
+   * independently and can be used alongside DisplayMode for backward compatibility.
    *
    * @param show boolean
    */
@@ -1536,6 +1554,261 @@ public class Form extends AppInventorCompatActivity
         getWindow().clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
       }
       showStatusBar = show;
+    }
+  }
+
+  /**
+   * DisplayMode property getter method.
+   *
+   * @return displayMode string value
+   */
+  @SimpleProperty(category = PropertyCategory.APPEARANCE,
+      description = "Controls how the screen layout interacts with system UI elements like the status bar, " +
+      "navigation bar, and screen cutouts. Options are: 'safe' (layout respects system UI), " +
+      "'edge-to-edge' (layout extends under system UI), or 'background-edge-to-edge' " +
+      "(background extends under system UI while components stay in safe area). " +
+      "This property is only active on Android 15+. On older versions, it has no effect. " +
+      "The ShowStatusBar property works independently and can be used alongside DisplayMode.")
+  public @Options(DisplayMode.class) String DisplayMode() {
+    return displayMode.toUnderlyingValue();
+  }
+
+  /**
+   * Sets the display mode for the screen.
+   * This controls how the app layout interacts with system UI elements.
+   *
+   * Available on Android 15+ only. On older Android versions, this property has no effect
+   * and the layout behaves as if 'safe' mode is set.
+   *
+   * The ShowStatusBar property works independently and can be used alongside DisplayMode.
+   * For example, you can use DisplayMode to control the overall layout strategy while
+   * using ShowStatusBar to specifically show/hide the status bar.
+   *
+   * @param mode The display mode as a string
+   */
+  @DesignerProperty(editorType = PropertyTypeConstants.PROPERTY_TYPE_DISPLAY_MODE,
+      defaultValue = "safe")
+  @SimpleProperty(category = PropertyCategory.APPEARANCE)
+  public void DisplayMode(@Options(DisplayMode.class) String mode) {
+    com.google.appinventor.components.common.DisplayMode newMode = 
+        com.google.appinventor.components.common.DisplayMode.fromUnderlyingValue(mode);
+    if (newMode == null) {
+      Log.w(LOG_TAG, "Invalid display mode: " + mode + ", defaulting to Safe");
+      newMode = com.google.appinventor.components.common.DisplayMode.Safe;
+    }
+    
+    // Synchronize to prevent race condition in check-then-act pattern
+    synchronized (this) {
+      if (newMode != displayMode) {
+        com.google.appinventor.components.common.DisplayMode oldMode = displayMode;
+        displayMode = newMode;
+        
+        // Telemetry: Log display mode changes for usage tracking and debugging
+        Log.i(LOG_TAG, "DisplayMode changed from " + oldMode.toUnderlyingValue() +
+            " to " + newMode.toUnderlyingValue() +
+            " (SDK: " + Build.VERSION.SDK_INT + ", Device: " + Build.MODEL + ")");
+        
+        setDisplayMode(displayMode);
+      }
+    }
+  }
+
+  /**
+   * Applies the specified display mode to the activity window.
+   * This method configures window flags and system UI visibility based on the display mode.
+   *
+   * Only available on Android 15 (VANILLA_ICE_CREAM) and above.
+   * Must be called on the UI thread.
+   *
+   * @param mode The display mode to apply (Safe, EdgeToEdge, or BackgroundEdgeToEdge)
+   */
+  protected void applyDisplayMode(com.google.appinventor.components.common.DisplayMode mode) {
+    // This method should only be called on SDK level VANILLA_ICE_CREAM or higher
+    if (SdkLevel.getLevel() < SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+      Log.w(LOG_TAG, "applyDisplayMode called on SDK level " + Build.VERSION.SDK_INT +
+          ", but it requires Android 15+ (VANILLA_ICE_CREAM)");
+      return;
+    }
+
+    // Get the window - null check required
+    android.view.Window window = getWindow();
+    if (window == null) {
+      Log.w(LOG_TAG, "applyDisplayMode: Window is null, cannot apply display mode");
+      return;
+    }
+
+    View decorView = window.getDecorView();
+    if (decorView == null) {
+      Log.w(LOG_TAG, "applyDisplayMode: DecorView is null, cannot apply display mode");
+      return;
+    }
+
+    try {
+      if (mode == com.google.appinventor.components.common.DisplayMode.EdgeToEdge) {
+        // Edge-to-edge: Extend under all system UI, hide system bars
+        
+        // Set window flags to enable edge-to-edge layout
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        
+        // Use WindowInsetsControllerCompat for compatibility
+        WindowInsetsControllerCompat insetsController = 
+            new WindowInsetsControllerCompat(window, decorView);
+        
+        if (insetsController != null) {
+          // Hide status bar and navigation bar
+          insetsController.hide(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+          // Use dark icons for the bars (appropriate for light system UI backgrounds)
+          insetsController.setAppearanceLightStatusBars(false);
+          insetsController.setAppearanceLightNavigationBars(false);
+        }
+      } else if (mode == com.google.appinventor.components.common.DisplayMode.BackgroundEdgeToEdge) {
+        // Background edge-to-edge: Background extends under system UI, components stay in safe area
+        
+        // Enable layout behind system UI
+        window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        
+        // Show system bars but allow layout behind them
+        WindowInsetsControllerCompat insetsController = 
+            new WindowInsetsControllerCompat(window, decorView);
+        
+        if (insetsController != null) {
+          // Show status bar and navigation bar
+          insetsController.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+        }
+      } else {
+        // Safe mode (default): Normal layout with system UI safe area respected
+        
+        // Clear layout flags to ensure normal behavior
+        window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+        window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+        
+        WindowInsetsControllerCompat insetsController = 
+            new WindowInsetsControllerCompat(window, decorView);
+        
+        if (insetsController != null) {
+          // Show system bars
+          insetsController.show(WindowInsets.Type.statusBars() | WindowInsets.Type.navigationBars());
+        }
+      }
+      
+      Log.i(LOG_TAG, "Display mode applied: " + mode.toUnderlyingValue());
+    } catch (Exception e) {
+      Log.e(LOG_TAG, "Error applying display mode: " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Internal method to apply the current display mode to the window.
+   * Wrapper method called when the DisplayMode property changes.
+   * Supports both modern (Android 15+) and legacy (API 14+) approaches.
+   *
+   * @param mode The display mode to set
+   */
+  protected void setDisplayMode(com.google.appinventor.components.common.DisplayMode mode) {
+    android.view.Window window = getWindow();
+    if (window == null) {
+      Log.w(LOG_TAG, "setDisplayMode: Window is null, cannot apply display mode");
+      return;
+    }
+
+    View decorView = window.getDecorView();
+    if (decorView == null) {
+      Log.w(LOG_TAG, "setDisplayMode: DecorView is null, cannot apply display mode");
+      return;
+    }
+
+    try {
+      // For Android 15+ (API 35+), use modern WindowInsetsController approach
+      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        applyDisplayMode(mode);
+      } 
+      // For older Android versions (API 14+), use legacy systemUiVisibility approach
+      else if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.ICE_CREAM_SANDWICH_MR1) {
+        applyDisplayModeLegacy(mode, window, decorView);
+      } 
+      // For very old Android versions, log a warning and no-op
+      else {
+        Log.d(LOG_TAG, "setDisplayMode: DisplayMode not supported on API level " +
+            Build.VERSION.SDK_INT + ". Requires API 14 or higher");
+      }
+    } catch (Exception e) {
+      Log.e(LOG_TAG, "Error in setDisplayMode: " + e.getMessage(), e);
+    }
+  }
+
+  /**
+   * Legacy implementation of display mode for Android API 14-34 using systemUiVisibility flags.
+   * This method uses the deprecated View.setSystemUiVisibility() approach which is necessary
+   * for backward compatibility with older Android versions.
+   *
+   * @param mode The display mode to apply
+   * @param window The activity window
+   * @param decorView The window's decor view
+   */
+  @SuppressLint("InlinedApi")
+  protected void applyDisplayModeLegacy(com.google.appinventor.components.common.DisplayMode mode,
+      android.view.Window window, View decorView) {
+    int systemUiVisibility = decorView.getSystemUiVisibility();
+
+    if (mode == com.google.appinventor.components.common.DisplayMode.EdgeToEdge) {
+      // Edge-to-edge: Hide system bars with immersive sticky mode
+      // FLAG_LAYOUT_NO_LIMITS allows layout behind system UI
+      window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+      
+      // Clear fullscreen flags if they were set
+      window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+      window.clearFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+      
+      // Set system UI visibility flags to hide navigation and status bars
+      int flags = View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+          | View.SYSTEM_UI_FLAG_FULLSCREEN
+          | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+          | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+          | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY;
+      
+      systemUiVisibility |= flags;
+      decorView.setSystemUiVisibility(systemUiVisibility);
+      
+      Log.d(LOG_TAG, "EdgeToEdge display mode applied (API " + Build.VERSION.SDK_INT + ")");
+
+    } else if (mode == com.google.appinventor.components.common.DisplayMode.BackgroundEdgeToEdge) {
+      // Background edge-to-edge: Allow layout behind system UI but show the bars
+      window.addFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+      window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+      window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+      
+      // Set flags to allow layout behind system UI but don't hide them
+      int flags = View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+          | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN;
+      
+      // Clear immersive flags if they were set
+      systemUiVisibility &= ~(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+          | View.SYSTEM_UI_FLAG_FULLSCREEN
+          | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+      
+      systemUiVisibility |= flags;
+      decorView.setSystemUiVisibility(systemUiVisibility);
+      
+      Log.d(LOG_TAG, "BackgroundEdgeToEdge display mode applied (API " + Build.VERSION.SDK_INT + ")");
+
+    } else {
+      // Safe mode (default): Normal layout with system UI visible
+      window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS);
+      window.clearFlags(WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN);
+      window.clearFlags(WindowManager.LayoutParams.FLAG_FULLSCREEN);
+      window.addFlags(WindowManager.LayoutParams.FLAG_FORCE_NOT_FULLSCREEN);
+      
+      // Clear all system UI visibility flags
+      systemUiVisibility &= ~(View.SYSTEM_UI_FLAG_HIDE_NAVIGATION
+          | View.SYSTEM_UI_FLAG_FULLSCREEN
+          | View.SYSTEM_UI_FLAG_LAYOUT_HIDE_NAVIGATION
+          | View.SYSTEM_UI_FLAG_LAYOUT_FULLSCREEN
+          | View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY);
+      
+      decorView.setSystemUiVisibility(systemUiVisibility);
+      
+      Log.d(LOG_TAG, "Safe display mode applied (API " + Build.VERSION.SDK_INT + ")");
     }
   }
 

@@ -35,6 +35,14 @@ public class SdkLevel {
   public static final int LEVEL_LOLLIPOP = 21;            // a.k.a. 5.0
   public static final int LEVEL_MARSHMALLOW = 23;         // a.k.a. 6.0
   public static final int LEVEL_NOUGAT = 24;              // a.k.a. 7.0
+  public static final int LEVEL_OREO = 26;                // a.k.a. 8.0
+  public static final int LEVEL_PIE = 28;                 // a.k.a. 9.0
+  public static final int LEVEL_Q = 29;                   // a.k.a. 10
+  public static final int LEVEL_R = 30;                   // a.k.a. 11
+  public static final int LEVEL_S = 31;                   // a.k.a. 12
+  public static final int LEVEL_TIRAMISU = 33;            // a.k.a. 13
+  public static final int LEVEL_UPSIDE_DOWN_CAKE = 34;    // a.k.a. 14
+  public static final int LEVEL_VANILLA_ICE_CREAM = 35;   // a.k.a. 15
 
   private SdkLevel() {
   }

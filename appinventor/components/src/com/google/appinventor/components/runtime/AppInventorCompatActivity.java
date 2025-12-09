@@ -28,6 +28,7 @@ import androidx.core.view.ViewCompat;
 import androidx.core.view.WindowCompat;
 import androidx.core.view.WindowInsetsCompat;
 import com.google.appinventor.components.common.ComponentConstants;
+import com.google.appinventor.components.common.DisplayMode;
 import com.google.appinventor.components.runtime.util.PaintUtil;
 import com.google.appinventor.components.runtime.util.SdkLevel;
 import com.google.appinventor.components.runtime.util.theme.ClassicThemeHelper;
@@ -65,6 +66,7 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
   private static boolean didSetClassicModeFromYail = false;
   @SuppressWarnings("WeakerAccess")  // Potentially useful to extensions with custom activities
   protected ThemeHelper themeHelper;
+  protected volatile DisplayMode displayMode = DisplayMode.Safe;
 
   @Override
   public void onCreate(Bundle icicle) {
@@ -92,18 +94,7 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
 
     frameWithTitle = new android.widget.LinearLayout(this);
     frameWithTitle.setOrientation(android.widget.LinearLayout.VERTICAL);
-    if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-      // SDK 35 (Vanilla Ice Cream) mandates edge-to-edge display, which means that we need
-      // to calculate insets to avoid any part of the app displaying under the status bar.
-      ViewCompat.setOnApplyWindowInsetsListener(getWindow().getDecorView(), (v, windowInsets) -> {
-        Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-        v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-
-        // Return CONSUMED if you don't want the window insets to keep passing
-        // down to descendant views.
-        return WindowInsetsCompat.CONSUMED;
-      });
-    }
+    
     setContentView(frameWithTitle);  // Due to a bug in Honeycomb 3.0 and 3.1, a content view must
                                      // exist before attempting to check the ActionBar status,
                                      // which is done indirectly via shouldCreateTitleBar()
@@ -171,6 +162,17 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
 
   @Override
   protected void onDestroy() {
+    // Clean up WindowInsets listeners to prevent memory leaks
+    if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+      Window window = getWindow();
+      if (window != null) {
+        View decorView = window.getDecorView();
+        if (decorView != null) {
+          ViewCompat.setOnApplyWindowInsetsListener(decorView, null);
+        }
+      }
+    }
+    
     super.onDestroy();
     if (appCompatDelegate != null) {
       appCompatDelegate.onDestroy();
@@ -274,8 +276,8 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
       // Only make the change if we have to...
       primaryColor = newColor;
       actionBar.setBackgroundDrawable(new ColorDrawable(color));
-      if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
-        // Sets the color of the status bar in end-to-end display
+      if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+        // Sets the color of the status bar in edge-to-edge display
         getWindow().getDecorView().setBackgroundColor(primaryColor);
       }
     }
@@ -352,22 +354,22 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
       case CLASSIC:
         setClassicMode(true);
         setTheme(android.R.style.Theme);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
           // tells the status bar whether to contrast with a light or dark color
-          // in end-to-end display.
+          // in edge-to-edge display.
           WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(false);
         }
         break;
       case DEVICE_DEFAULT:
       case BLACK_TITLE_TEXT:
         setTheme(android.R.style.Theme_DeviceDefault_Light_NoActionBar);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
           WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(true);
         }
         break;
       case DARK:
         setTheme(android.R.style.Theme_DeviceDefault_NoActionBar);
-        if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.VANILLA_ICE_CREAM) {
+        if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
           WindowCompat.getInsetsController(getWindow(), getWindow().getDecorView()).setAppearanceLightStatusBars(false);
         }
         break;
@@ -390,5 +392,146 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
       classicMode = newClassicMode;
       didSetClassicModeFromYail = true;
     }
+  }
+
+  /**
+   * Applies the specified display mode to control how the app layout interacts with system UI.
+   * This method handles edge-to-edge display for Android 15+ (API 35+).
+   *
+   * Thread Safety: This method should be called from the UI thread only.
+   *
+   * @param mode The display mode to apply (Safe, EdgeToEdge, or BackgroundEdgeToEdge)
+   */
+  protected void applyDisplayMode(DisplayMode mode) {
+    if (SdkLevel.getLevel() < SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+      // Telemetry: Log when DisplayMode is set on unsupported Android versions
+      Log.d(LOG_TAG, "DisplayMode." + mode.toUnderlyingValue() +
+          " requested but not applied (SDK " + SdkLevel.getLevel() + " < 35)");
+      return;  // Display mode only applies to Android 15+
+    }
+
+    this.displayMode = mode;
+    
+    // Telemetry: Log display mode application with device details
+    Log.i(LOG_TAG, "Applying DisplayMode: " + mode.toUnderlyingValue() +
+        " (SDK: " + Build.VERSION.SDK_INT + ", Device: " + Build.MANUFACTURER +
+        " " + Build.MODEL + ")");
+    
+    Window window = getWindow();
+    if (window == null) {
+      Log.w(LOG_TAG, "Window not available, deferring display mode application");
+      return;
+    }
+    
+    View decorView = window.getDecorView();
+    if (decorView == null) {
+      Log.w(LOG_TAG, "DecorView not available, deferring display mode application");
+      return;
+    }
+
+    // Clear any existing WindowInsets listener to prevent memory leaks
+    ViewCompat.setOnApplyWindowInsetsListener(decorView, null);
+
+    switch (mode) {
+      case Safe:
+        // Safe area mode - apply padding to avoid system bars
+        // Use manual inset handling for consistency with other modes and explicit control
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
+          if (windowInsets == null) {
+            Log.w(LOG_TAG, "WindowInsets is null in Safe mode");
+            return WindowInsetsCompat.CONSUMED;
+          }
+          Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+          if (insets == null) {
+            Log.w(LOG_TAG, "System bar insets are null in Safe mode");
+            return WindowInsetsCompat.CONSUMED;
+          }
+          decorView.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+          // Telemetry: Log insets for debugging layout issues
+          Log.d(LOG_TAG, "Safe mode insets applied: left=" + insets.left +
+              ", top=" + insets.top + ", right=" + insets.right + ", bottom=" + insets.bottom);
+          return WindowInsetsCompat.CONSUMED;
+        });
+        break;
+
+      case EdgeToEdge:
+        // Edge-to-edge mode - layout extends under system bars
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
+          if (windowInsets == null) {
+            Log.w(LOG_TAG, "WindowInsets is null in EdgeToEdge mode");
+            return WindowInsetsCompat.CONSUMED;
+          }
+          // Don't apply any padding - let content extend under system bars
+          decorView.setPadding(0, 0, 0, 0);
+          // Telemetry: Log that edge-to-edge is active
+          Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+          if (insets != null) {
+            Log.d(LOG_TAG, "EdgeToEdge mode active, system bars: left=" + insets.left +
+                ", top=" + insets.top + ", right=" + insets.right + ", bottom=" + insets.bottom);
+          }
+          // Return windowInsets (not CONSUMED) to allow child views to access inset information
+          return windowInsets;
+        });
+        break;
+
+      case BackgroundEdgeToEdge:
+        // Hybrid mode - background extends edge-to-edge, but content respects safe area
+        WindowCompat.setDecorFitsSystemWindows(window, false);
+        ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
+          if (windowInsets == null) {
+            Log.w(LOG_TAG, "WindowInsets is null in BackgroundEdgeToEdge mode");
+            return WindowInsetsCompat.CONSUMED;
+          }
+          // Apply padding only to the content container, not the background
+          Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+          if (insets == null) {
+            Log.w(LOG_TAG, "System bar insets are null in BackgroundEdgeToEdge mode");
+            return WindowInsetsCompat.CONSUMED;
+          }
+          // Clear padding on decor view
+          decorView.setPadding(0, 0, 0, 0);
+          // Apply padding to frameWithTitle to keep content in safe area
+          // Use local variable to avoid TOCTOU race condition
+          android.widget.LinearLayout frame = frameWithTitle;
+          if (frame != null) {
+            frame.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            // Telemetry: Log hybrid mode insets
+            Log.d(LOG_TAG, "BackgroundEdgeToEdge mode: content padding applied: left=" +
+                insets.left + ", top=" + insets.top + ", right=" + insets.right +
+                ", bottom=" + insets.bottom);
+          } else {
+            Log.w(LOG_TAG, "frameWithTitle is null, cannot apply padding for BackgroundEdgeToEdge mode");
+          }
+          return WindowInsetsCompat.CONSUMED;
+        });
+        break;
+    }
+
+    // Request that the insets be applied immediately
+    ViewCompat.requestApplyInsets(decorView);
+    Log.d(LOG_TAG, "Applied display mode: " + mode.toUnderlyingValue());
+  }
+
+  /**
+   * Sets the display mode for the activity.
+   * This controls how the app layout interacts with system UI elements.
+   *
+   * @param mode The display mode to set
+   */
+  protected void setDisplayMode(DisplayMode mode) {
+    if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
+      applyDisplayMode(mode);
+    }
+  }
+
+  /**
+   * Gets the current display mode.
+   *
+   * @return The current display mode
+   */
+  protected DisplayMode getDisplayMode() {
+    return displayMode;
   }
 }

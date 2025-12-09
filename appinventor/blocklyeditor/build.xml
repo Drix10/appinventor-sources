@@ -202,7 +202,11 @@
 				<jvmarg value="-Dfile.encoding=UTF-8"/>
 				<jvmarg value="-Djava.awt.headless=true"/>
 			</java>
-			<exec executable="node_modules/.bin/karma" dir="${appinventor.dir}" failonerror="true">
+			<exec executable="node_modules/.bin/karma.cmd" dir="${appinventor.dir}" failonerror="true" osfamily="windows">
+				<arg value="start"/>
+				<arg value="--single-run"/>
+			</exec>
+			<exec executable="node_modules/.bin/karma" dir="${appinventor.dir}" failonerror="true" osfamily="unix">
 				<arg value="start"/>
 				<arg value="--single-run"/>
 			</exec>

@@ -1252,6 +1252,14 @@ public final class YoungAndroidFormUpgrader {
       srcCompVersion = 31;
     }
 
+    if (srcCompVersion < 32) {
+      // The DisplayMode property was added to control edge-to-edge display and safe area layout.
+      // For backward compatibility, we don't need to add the property explicitly
+      // since the default value "safe" matches the old behavior where layouts
+      // respected system UI boundaries.
+      srcCompVersion = 32;
+    }
+
     return srcCompVersion;
   }
 
