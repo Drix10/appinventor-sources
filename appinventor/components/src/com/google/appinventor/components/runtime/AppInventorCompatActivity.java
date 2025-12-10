@@ -458,75 +458,66 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
         }
         
         if (hideStatusBar) {
-          // User wants status bar hidden - hide it using WindowInsetsController
+          // User wants status bar hidden - use immersive mode
+          WindowCompat.setDecorFitsSystemWindows(window, false);
           if (insetsController != null) {
             insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.statusBars());
             insetsController.setSystemBarsBehavior(
                 androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
           }
+          ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
+            if (windowInsets == null) {
+              return WindowInsetsCompat.CONSUMED;
+            }
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            if (insets != null) {
+              decorView.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            }
+            return WindowInsetsCompat.CONSUMED;
+          });
         } else {
-          // Show status bar
+          // Show status bar - use traditional layout
+          WindowCompat.setDecorFitsSystemWindows(window, true);
           if (insetsController != null) {
             insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars());
           }
+          // Clear padding when using traditional layout
+          decorView.setPadding(0, 0, 0, 0);
         }
-        
-        // Use manual inset handling for consistency with other modes and explicit control
-        WindowCompat.setDecorFitsSystemWindows(window, false);
-        ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
-          if (windowInsets == null) {
-            Log.w(LOG_TAG, "WindowInsets is null in Safe mode");
-            return WindowInsetsCompat.CONSUMED;
-          }
-          Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-          if (insets == null) {
-            Log.w(LOG_TAG, "System bar insets are null in Safe mode");
-            return WindowInsetsCompat.CONSUMED;
-          }
-          decorView.setPadding(insets.left, insets.top, insets.right, insets.bottom);
-          // Telemetry: Log insets for debugging layout issues
-          Log.d(LOG_TAG, "Safe mode insets applied: left=" + insets.left +
-              ", top=" + insets.top + ", right=" + insets.right + ", bottom=" + insets.bottom);
-          return WindowInsetsCompat.CONSUMED;
-        });
         break;
 
       case EdgeToEdge:
-        // Edge-to-edge mode - layout extends under system bars
-        // In EdgeToEdge mode, hide system bars regardless of ShowStatusBar property
+        // Edge-to-edge mode - layout extends under system bars, bars hidden
+        WindowCompat.setDecorFitsSystemWindows(window, false);
         if (insetsController != null) {
           insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());
           insetsController.setSystemBarsBehavior(
               androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
         }
         
-        WindowCompat.setDecorFitsSystemWindows(window, false);
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
-          if (windowInsets == null) {
-            Log.w(LOG_TAG, "WindowInsets is null in EdgeToEdge mode");
-            return WindowInsetsCompat.CONSUMED;
-          }
           // Don't apply any padding - let content extend under system bars
           decorView.setPadding(0, 0, 0, 0);
-          // Telemetry: Log that edge-to-edge is active
-          Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-          if (insets != null) {
-            Log.d(LOG_TAG, "EdgeToEdge mode active, system bars: left=" + insets.left +
-                ", top=" + insets.top + ", right=" + insets.right + ", bottom=" + insets.bottom);
+          if (windowInsets != null) {
+            Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
+            if (insets != null) {
+              Log.d(LOG_TAG, "EdgeToEdge mode active, system bars: left=" + insets.left +
+                  ", top=" + insets.top + ", right=" + insets.right + ", bottom=" + insets.bottom);
+            }
           }
           // Return windowInsets (not CONSUMED) to allow child views to access inset information
-          return windowInsets;
+          return windowInsets != null ? windowInsets : WindowInsetsCompat.CONSUMED;
         });
         break;
 
       case BackgroundEdgeToEdge:
         // Hybrid mode - background extends edge-to-edge, but content respects safe area
-        // Show system bars but allow layout behind them
+        // Show system bars and allow layout behind them
+        WindowCompat.setDecorFitsSystemWindows(window, false);
         if (insetsController != null) {
           insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
         }
         
-        WindowCompat.setDecorFitsSystemWindows(window, false);
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
           if (windowInsets == null) {
             Log.w(LOG_TAG, "WindowInsets is null in BackgroundEdgeToEdge mode");

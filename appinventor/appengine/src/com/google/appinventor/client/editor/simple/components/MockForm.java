@@ -995,8 +995,10 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       responsivePanel.getElement().getStyle().clearProperty("top");
       responsivePanel.getElement().getStyle().clearProperty("position");
       formWidget.getElement().getStyle().clearProperty("paddingTop");
+      formWidget.getElement().getStyle().clearProperty("marginTop");
       if (scrollPanel != null) {
         scrollPanel.getElement().getStyle().clearProperty("paddingTop");
+        scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
     } else if ("background-edge-to-edge".equals(mode)) {
       // BackgroundEdgeToEdge: Background extends, content respects insets, system bars visible
@@ -1005,14 +1007,17 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       phoneBar.setVisibility(true);
       // Make phoneBar semi-transparent to show it's overlaid on background
       phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_BACKGROUND_EDGE);
-      // Position responsivePanel to start at top (behind phoneBar)
-      responsivePanel.getElement().getStyle().setProperty("position", "relative");
-      responsivePanel.getElement().getStyle().setProperty("top", "0px");
-      // But add padding to scrollPanel to keep content below phoneBar
+      // Don't change responsivePanel position - keep normal flow
+      responsivePanel.getElement().getStyle().clearProperty("position");
+      responsivePanel.getElement().getStyle().clearProperty("top");
+      responsivePanel.getElement().getStyle().clearProperty("paddingTop");
+      formWidget.getElement().getStyle().clearProperty("paddingTop");
+      formWidget.getElement().getStyle().clearProperty("marginTop");
+      // Add padding to scrollPanel to keep content below phoneBar
       if (scrollPanel != null) {
         scrollPanel.getElement().getStyle().setProperty("paddingTop", phoneBar.getHeight() + "px");
+        scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
-      formWidget.getElement().getStyle().clearProperty("paddingTop");
     } else {
       // Safe mode (default): Traditional layout with system bars
       // In Safe mode, respect the ShowStatusBar property setting
@@ -1024,8 +1029,10 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       responsivePanel.getElement().getStyle().clearProperty("top");
       responsivePanel.getElement().getStyle().clearProperty("position");
       formWidget.getElement().getStyle().clearProperty("paddingTop");
+      formWidget.getElement().getStyle().clearProperty("marginTop");
       if (scrollPanel != null) {
         scrollPanel.getElement().getStyle().clearProperty("paddingTop");
+        scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
     }
     
