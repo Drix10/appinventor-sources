@@ -1551,10 +1551,15 @@ public class Form extends AppInventorCompatActivity
   public synchronized void ShowStatusBar(boolean show) {
     if (show != showStatusBar) {
       showStatusBar = show;
-      // On Android 15+, re-apply display mode to ensure consistency
-      // DisplayMode takes precedence and will handle status bar visibility
+      // On Android 15+, only re-apply if in Safe mode
+      // In EdgeToEdge and BackgroundEdgeToEdge modes, ShowStatusBar has no effect
       if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
-        applyDisplayMode(displayMode);
+        if (displayMode == com.google.appinventor.components.common.DisplayMode.Safe) {
+          // Only re-apply in Safe mode where ShowStatusBar actually matters
+          applyDisplayMode(displayMode);
+        }
+        // In EdgeToEdge and BackgroundEdgeToEdge modes, do nothing - those modes
+        // control system bar visibility independently of ShowStatusBar
       } else {
         // Legacy behavior for pre-Android 15 devices
         if (show) {

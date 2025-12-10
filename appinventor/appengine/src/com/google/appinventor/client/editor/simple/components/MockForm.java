@@ -990,10 +990,16 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       phoneBar.setVisible(false);
       phoneBar.setVisibility(false);
       phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_NORMAL);
-      // Clear any padding/positioning adjustments
+      
+      // Position responsivePanel absolutely to extend behind the phone frame
+      // This compensates for the phoneWidget's padding (phone frame borders)
+      responsivePanel.getElement().getStyle().setProperty("position", "absolute");
+      responsivePanel.getElement().getStyle().setProperty("top", "0");
+      responsivePanel.getElement().getStyle().setProperty("left", "0");
+      responsivePanel.getElement().getStyle().setProperty("right", "0");
+      responsivePanel.getElement().getStyle().setProperty("bottom", "0");
       responsivePanel.getElement().getStyle().clearProperty("paddingTop");
-      responsivePanel.getElement().getStyle().clearProperty("top");
-      responsivePanel.getElement().getStyle().clearProperty("position");
+      
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
       if (scrollPanel != null) {
@@ -1007,10 +1013,15 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       phoneBar.setVisibility(true);
       // Make phoneBar semi-transparent to show it's overlaid on background
       phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_BACKGROUND_EDGE);
-      // Don't change responsivePanel position - keep normal flow
-      responsivePanel.getElement().getStyle().clearProperty("position");
-      responsivePanel.getElement().getStyle().clearProperty("top");
+      
+      // Position responsivePanel absolutely to extend behind the phone frame
+      responsivePanel.getElement().getStyle().setProperty("position", "absolute");
+      responsivePanel.getElement().getStyle().setProperty("top", "0");
+      responsivePanel.getElement().getStyle().setProperty("left", "0");
+      responsivePanel.getElement().getStyle().setProperty("right", "0");
+      responsivePanel.getElement().getStyle().setProperty("bottom", "0");
       responsivePanel.getElement().getStyle().clearProperty("paddingTop");
+      
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
       // Add padding to scrollPanel to keep content below phoneBar
@@ -1024,10 +1035,13 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       phoneBar.setVisible(showStatusBar);
       phoneBar.setVisibility(showStatusBar);
       phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_NORMAL);
-      // Clear any positioning adjustments
-      responsivePanel.getElement().getStyle().clearProperty("paddingTop");
-      responsivePanel.getElement().getStyle().clearProperty("top");
+      // Clear any positioning adjustments - return to normal flow
       responsivePanel.getElement().getStyle().clearProperty("position");
+      responsivePanel.getElement().getStyle().clearProperty("top");
+      responsivePanel.getElement().getStyle().clearProperty("left");
+      responsivePanel.getElement().getStyle().clearProperty("right");
+      responsivePanel.getElement().getStyle().clearProperty("bottom");
+      responsivePanel.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
       if (scrollPanel != null) {
