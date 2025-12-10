@@ -982,6 +982,12 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       return;
     }
     
+    // Additional safety: check that elements are attached to DOM
+    if (phoneBar.getElement() == null || formWidget.getElement() == null || responsivePanel.getElement() == null) {
+      LOG.warning("MockForm: Widget elements not attached to DOM, deferring DisplayMode preview");
+      return;
+    }
+    
     // Visual feedback for DisplayMode in designer preview
     // This shows developers what edge-to-edge will look like on Android 15+
     if ("edge-to-edge".equals(mode)) {

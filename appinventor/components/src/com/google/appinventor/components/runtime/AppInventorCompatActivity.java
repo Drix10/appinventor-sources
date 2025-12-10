@@ -154,7 +154,16 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
     // Re-apply display mode after configuration change to ensure WindowInsets
     // listeners are properly re-registered and insets are recalculated
     if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
-      applyDisplayMode(displayMode);
+      try {
+        // Use local variable to avoid race condition
+        DisplayMode currentMode = displayMode;
+        if (currentMode != null) {
+          applyDisplayMode(currentMode);
+        }
+      } catch (Exception e) {
+        // Defensive: Log but don't crash on configuration change
+        Log.e(LOG_TAG, "Error re-applying DisplayMode on configuration change", e);
+      }
     }
   }
 
@@ -170,12 +179,17 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
   protected void onDestroy() {
     // Clean up WindowInsets listeners to prevent memory leaks
     if (SdkLevel.getLevel() >= SdkLevel.LEVEL_VANILLA_ICE_CREAM) {
-      Window window = getWindow();
-      if (window != null) {
-        View decorView = window.getDecorView();
-        if (decorView != null) {
-          ViewCompat.setOnApplyWindowInsetsListener(decorView, null);
+      try {
+        Window window = getWindow();
+        if (window != null) {
+          View decorView = window.getDecorView();
+          if (decorView != null) {
+            ViewCompat.setOnApplyWindowInsetsListener(decorView, null);
+          }
         }
+      } catch (Exception e) {
+        // Defensive: Don't let cleanup errors crash the app during destruction
+        Log.w(LOG_TAG, "Error cleaning up WindowInsets listener in onDestroy", e);
       }
     }
     
@@ -427,13 +441,13 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
         " (SDK: " + Build.VERSION.SDK_INT + ", Device: " + Build.MANUFACTURER +
         " " + Build.MODEL + ")");
     
-    Window window = getWindow();
+    final Window window = getWindow();
     if (window == null) {
       Log.w(LOG_TAG, "Window not available, deferring display mode application");
       return;
     }
     
-    View decorView = window.getDecorView();
+    final View decorView = window.getDecorView();
     if (decorView == null) {
       Log.w(LOG_TAG, "DecorView not available, deferring display mode application");
       return;
@@ -450,11 +464,17 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
       case Safe:
         // Safe area mode - apply padding to avoid system bars
         // In Safe mode, respect the ShowStatusBar property
+        // Use local variable to avoid TOCTOU race condition with activeForm
         Form activeForm = Form.getActiveForm();
-        boolean hideStatusBar = false;
+        boolean hideStatusBar = true;  // Default to hiding if no active form
         if (activeForm != null) {
-          // Store result to avoid TOCTOU (Time-Of-Check-Time-Of-Use) race condition
-          hideStatusBar = !activeForm.ShowStatusBar();
+          try {
+            hideStatusBar = !activeForm.ShowStatusBar();
+          } catch (Exception e) {
+            // Defensive: If ShowStatusBar() throws, default to hiding
+            Log.w(LOG_TAG, "Error reading ShowStatusBar property, defaulting to hide", e);
+            hideStatusBar = true;
+          }
         }
         
         if (hideStatusBar) {
@@ -467,11 +487,14 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
           }
           ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
             if (windowInsets == null) {
+              Log.w(LOG_TAG, "Safe mode (hide status bar): windowInsets is null");
               return WindowInsetsCompat.CONSUMED;
             }
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
-            if (insets != null) {
-              decorView.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            if (insets != null && v != null) {
+              v.setPadding(insets.left, insets.top, insets.right, insets.bottom);
+            } else {
+              Log.w(LOG_TAG, "Safe mode (hide status bar): insets or view is null");
             }
             return WindowInsetsCompat.CONSUMED;
           });
@@ -482,7 +505,9 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
             insetsController.show(androidx.core.view.WindowInsetsCompat.Type.statusBars());
           }
           // Clear padding when using traditional layout
-          decorView.setPadding(0, 0, 0, 0);
+          if (decorView != null) {
+            decorView.setPadding(0, 0, 0, 0);
+          }
         }
         break;
 
@@ -493,17 +518,25 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
           insetsController.hide(androidx.core.view.WindowInsetsCompat.Type.systemBars());
           insetsController.setSystemBarsBehavior(
               androidx.core.view.WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE);
+        } else {
+          Log.w(LOG_TAG, "EdgeToEdge mode: insetsController is null, cannot hide system bars");
         }
         
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
           // Don't apply any padding - let content extend under system bars
-          decorView.setPadding(0, 0, 0, 0);
+          if (v != null) {
+            v.setPadding(0, 0, 0, 0);
+          }
           if (windowInsets != null) {
             Insets insets = windowInsets.getInsets(WindowInsetsCompat.Type.systemBars());
             if (insets != null) {
               Log.d(LOG_TAG, "EdgeToEdge mode active, system bars: left=" + insets.left +
                   ", top=" + insets.top + ", right=" + insets.right + ", bottom=" + insets.bottom);
+            } else {
+              Log.w(LOG_TAG, "EdgeToEdge mode: system bar insets are null");
             }
+          } else {
+            Log.w(LOG_TAG, "EdgeToEdge mode: windowInsets is null");
           }
           // Return windowInsets (not CONSUMED) to allow child views to access inset information
           return windowInsets != null ? windowInsets : WindowInsetsCompat.CONSUMED;
@@ -516,6 +549,8 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
         WindowCompat.setDecorFitsSystemWindows(window, false);
         if (insetsController != null) {
           insetsController.show(androidx.core.view.WindowInsetsCompat.Type.systemBars());
+        } else {
+          Log.w(LOG_TAG, "BackgroundEdgeToEdge mode: insetsController is null, cannot show system bars");
         }
         
         ViewCompat.setOnApplyWindowInsetsListener(decorView, (v, windowInsets) -> {
@@ -530,7 +565,9 @@ public class AppInventorCompatActivity extends Activity implements AppCompatCall
             return WindowInsetsCompat.CONSUMED;
           }
           // Clear padding on decor view
-          decorView.setPadding(0, 0, 0, 0);
+          if (v != null) {
+            v.setPadding(0, 0, 0, 0);
+          }
           // Apply padding to frameWithTitle to keep content in safe area
           // Use local variable to avoid TOCTOU race condition
           android.widget.LinearLayout frame = frameWithTitle;
