@@ -31,6 +31,7 @@ import Foundation
     "Form": [
       "CloseScreenAnimation": ScreenAnimation.fromUnderlyingValue(_:),
       "DefaultFileScope": FileScope.fromUnderlyingValue(_:),
+      "DisplayMode": DisplayMode.fromUnderlyingValue(_:),
       "OpenScreenAnimation": ScreenAnimation.fromUnderlyingValue(_:),
       "ScreenOrientation": ScreenOrientation.fromUnderlyingValue(_:)
     ],

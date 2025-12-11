@@ -589,6 +589,15 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       scrollbarWidth = getVerticalScrollbarWidth();
     }
 
+    // Calculate phoneBar height once to avoid TOCTOU race condition
+    // Use local variable to ensure consistent value throughout method
+    int phoneBarHeight = 0;
+    if (phoneBar != null) {
+      // Check visibility state, not just isVisible() which can change
+      boolean phoneBarVisible = phoneBar.isVisible();
+      phoneBarHeight = phoneBarVisible ? phoneBar.getHeight() : 0;
+    }
+
     if (landscape) {
       String val = editor.getProjectEditor().getProjectSettingsProperty(
           SettingsConstants.PROJECT_YOUNG_ANDROID_SETTINGS,
@@ -598,13 +607,11 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       } else {
         usableScreenWidth = screenWidth - navigationBar.getHeight();
       }
-      // Only subtract phoneBar height if it's actually visible
-      int phoneBarHeight = (phoneBar != null && phoneBar.isVisible()) ? phoneBar.getHeight() : 0;
+      // Use pre-calculated phoneBarHeight to avoid race condition
       usableScreenHeight = screenHeight - phoneBarHeight - titleBar.getHeight();
     } else {
       usableScreenWidth = screenWidth;
-      // Only subtract phoneBar height if it's actually visible
-      int phoneBarHeight = (phoneBar != null && phoneBar.isVisible()) ? phoneBar.getHeight() : 0;
+      // Use pre-calculated phoneBarHeight to avoid race condition
       usableScreenHeight = screenHeight - phoneBarHeight - titleBar.getHeight() - navigationBar.getHeight();
     }
     rootPanel.setPixelSize(usableScreenWidth, usableScreenHeight);
@@ -1002,7 +1009,13 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
     
     // CRITICAL FIX: Ensure formWidget has overflow:hidden to maintain rounded corners
     // Without this, content extends beyond border-radius causing "pointy edges" issue
+    // This prevents child elements from rendering outside the parent's border-radius
     formWidget.getElement().getStyle().setProperty("overflow", "hidden");
+    
+    // Additional fix: Ensure phoneWidget also has overflow:hidden for iOS rounded corners
+    if (phoneWidget != null && phoneWidget.getElement() != null) {
+      phoneWidget.getElement().getStyle().setProperty("overflow", "hidden");
+    }
     
     // Visual feedback for DisplayMode in designer preview
     // This shows developers what edge-to-edge will look like on Android 15+
@@ -1071,6 +1084,12 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
         scrollPanel.getElement().getStyle().clearProperty("paddingTop");
         scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
+    }
+    
+    // CRITICAL: Force browser reflow to ensure styles are applied before resize
+    // This prevents visual glitches when rapidly changing DisplayMode
+    if (formWidget != null && formWidget.getElement() != null) {
+      formWidget.getElement().getOffsetHeight(); // Force reflow
     }
     
     // CRITICAL: Recalculate panel dimensions after changing phoneBar visibility

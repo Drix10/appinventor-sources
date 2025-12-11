@@ -1273,6 +1273,17 @@ Top-level component containing all other components in the program.
  <a href="/reference/components/storage.html#File" target="_blank">File</a>
  component has its own property for controlling file scopes.
 
+{:id="Screen.DisplayMode" .text} *DisplayMode*
+: Sets the display mode for the screen.
+ This controls how the app layout interacts with system UI elements.
+
+ Available on Android 15+ only. On older Android versions, this property has no effect
+ and the layout behaves as if 'safe' mode is set.
+
+ The ShowStatusBar property works independently and can be used alongside DisplayMode.
+ For example, you can use DisplayMode to control the overall layout strategy while
+ using ShowStatusBar to specifically show/hide the status bar.
+
 {:id="Screen.Height" .number .ro .bo} *Height*
 : Returns the Screen height in pixels (y-size).
 
@@ -1349,6 +1360,13 @@ Top-level component containing all other components in the program.
 {:id="Screen.ShowStatusBar" .boolean} *ShowStatusBar*
 : The status bar is the topmost bar on the screen. This property reports whether the status bar
  is visible.
+
+ Note: On Android 15+, the DisplayMode property provides more comprehensive control over
+ screen layout including status bar, navigation bar, and cutouts. ShowStatusBar works
+ alongside DisplayMode:
+ - In Safe mode: ShowStatusBar controls status bar visibility
+ - In EdgeToEdge mode: Status bar is always hidden (ShowStatusBar has no effect)
+ - In BackgroundEdgeToEdge mode: Status bar is always shown (ShowStatusBar has no effect)
 
 {:id="Screen.Sizing" .text .wo .do} *Sizing*
 : If set to responsive (the default), screen layouts will use the actual resolution of the
