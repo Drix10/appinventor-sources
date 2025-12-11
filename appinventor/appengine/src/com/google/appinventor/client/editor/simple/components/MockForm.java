@@ -1000,6 +1000,10 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       return;
     }
     
+    // CRITICAL FIX: Ensure formWidget has overflow:hidden to maintain rounded corners
+    // Without this, content extends beyond border-radius causing "pointy edges" issue
+    formWidget.getElement().getStyle().setProperty("overflow", "hidden");
+    
     // Visual feedback for DisplayMode in designer preview
     // This shows developers what edge-to-edge will look like on Android 15+
     if ("edge-to-edge".equals(mode)) {
@@ -1020,7 +1024,7 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       // Remove all padding/margins to show full edge-to-edge effect
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
-      if (scrollPanel != null) {
+      if (scrollPanel != null && scrollPanel.getElement() != null) {
         scrollPanel.getElement().getStyle().clearProperty("paddingTop");
         scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
@@ -1043,7 +1047,7 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
       // Add padding to scrollPanel to push content below the semi-transparent phoneBar
-      if (scrollPanel != null) {
+      if (scrollPanel != null && scrollPanel.getElement() != null) {
         scrollPanel.getElement().getStyle().setProperty("paddingTop", phoneBar.getHeight() + "px");
         scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
@@ -1063,12 +1067,13 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       responsivePanel.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
-      if (scrollPanel != null) {
+      if (scrollPanel != null && scrollPanel.getElement() != null) {
         scrollPanel.getElement().getStyle().clearProperty("paddingTop");
         scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
     }
     
+    // CRITICAL: Recalculate panel dimensions after changing phoneBar visibility
     // Only resize if dimensions are valid and have changed
     if (screenWidth > 0 && screenHeight > 0) {
       resizePanel(screenWidth, screenHeight);
