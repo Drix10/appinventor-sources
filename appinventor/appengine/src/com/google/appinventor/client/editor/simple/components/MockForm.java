@@ -967,8 +967,16 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
 
   private void setShowStatusBarProperty(String text) {
     showStatusBar = Boolean.parseBoolean(text);
-    phoneBar.setVisible(showStatusBar);
-    phoneBar.setVisibility(showStatusBar);
+    // Re-apply current DisplayMode to respect the interaction rules
+    // This ensures ShowStatusBar only affects Safe mode
+    String currentMode = getPropertyValue(PROPERTY_NAME_DISPLAY_MODE);
+    if (currentMode != null && !currentMode.isEmpty()) {
+      setDisplayModeProperty(currentMode);
+    } else {
+      // Fallback: apply ShowStatusBar directly (Safe mode default)
+      phoneBar.setVisible(showStatusBar);
+      phoneBar.setVisibility(showStatusBar);
+    }
     if (screenWidth == 0 || screenHeight == 0) { // This happens when a project is loaded
       return;                                    // so don't attempt to resize to 0,0
     }
@@ -991,21 +999,21 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
     // Visual feedback for DisplayMode in designer preview
     // This shows developers what edge-to-edge will look like on Android 15+
     if ("edge-to-edge".equals(mode)) {
-      // EdgeToEdge: Content extends behind system bars, system bars hidden
-      // In EdgeToEdge mode, system bars are always hidden regardless of ShowStatusBar
+      // EdgeToEdge: Content extends to screen edges, NO system bars
+      // In EdgeToEdge mode, system bars are ALWAYS HIDDEN regardless of ShowStatusBar
       phoneBar.setVisible(false);
       phoneBar.setVisibility(false);
       phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_NORMAL);
       
-      // Position responsivePanel absolutely to extend behind the phone frame
-      // This compensates for the phoneWidget's padding (phone frame borders)
-      responsivePanel.getElement().getStyle().setProperty("position", "absolute");
-      responsivePanel.getElement().getStyle().setProperty("top", "0");
-      responsivePanel.getElement().getStyle().setProperty("left", "0");
-      responsivePanel.getElement().getStyle().setProperty("right", "0");
-      responsivePanel.getElement().getStyle().setProperty("bottom", "0");
+      // Keep normal flow but remove phoneBar from layout calculation
+      responsivePanel.getElement().getStyle().clearProperty("position");
+      responsivePanel.getElement().getStyle().clearProperty("top");
+      responsivePanel.getElement().getStyle().clearProperty("left");
+      responsivePanel.getElement().getStyle().clearProperty("right");
+      responsivePanel.getElement().getStyle().clearProperty("bottom");
       responsivePanel.getElement().getStyle().clearProperty("paddingTop");
       
+      // Remove all padding/margins to show full edge-to-edge effect
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
       if (scrollPanel != null) {
@@ -1013,34 +1021,35 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
         scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
     } else if ("background-edge-to-edge".equals(mode)) {
-      // BackgroundEdgeToEdge: Background extends, content respects insets, system bars visible
-      // In BackgroundEdgeToEdge mode, system bars are always shown regardless of ShowStatusBar
+      // BackgroundEdgeToEdge: Background extends to edges, content BELOW status bar
+      // In BackgroundEdgeToEdge mode, system bars are ALWAYS SHOWN regardless of ShowStatusBar
       phoneBar.setVisible(true);
       phoneBar.setVisibility(true);
-      // Make phoneBar semi-transparent to show it's overlaid on background
+      // Make phoneBar semi-transparent to show background extends behind it
       phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_BACKGROUND_EDGE);
       
-      // Position responsivePanel absolutely to extend behind the phone frame
-      responsivePanel.getElement().getStyle().setProperty("position", "absolute");
-      responsivePanel.getElement().getStyle().setProperty("top", "0");
-      responsivePanel.getElement().getStyle().setProperty("left", "0");
-      responsivePanel.getElement().getStyle().setProperty("right", "0");
-      responsivePanel.getElement().getStyle().setProperty("bottom", "0");
+      // Keep normal flow
+      responsivePanel.getElement().getStyle().clearProperty("position");
+      responsivePanel.getElement().getStyle().clearProperty("top");
+      responsivePanel.getElement().getStyle().clearProperty("left");
+      responsivePanel.getElement().getStyle().clearProperty("right");
+      responsivePanel.getElement().getStyle().clearProperty("bottom");
       responsivePanel.getElement().getStyle().clearProperty("paddingTop");
       
       formWidget.getElement().getStyle().clearProperty("paddingTop");
       formWidget.getElement().getStyle().clearProperty("marginTop");
-      // Add padding to scrollPanel to keep content below phoneBar
+      // Add padding to scrollPanel to push content below the semi-transparent phoneBar
       if (scrollPanel != null) {
         scrollPanel.getElement().getStyle().setProperty("paddingTop", phoneBar.getHeight() + "px");
         scrollPanel.getElement().getStyle().clearProperty("marginTop");
       }
     } else {
-      // Safe mode (default): Traditional layout with system bars
-      // In Safe mode, respect the ShowStatusBar property setting
+      // Safe mode (default): Traditional layout, respects ShowStatusBar
+      // In Safe mode, ShowStatusBar property controls status bar visibility
       phoneBar.setVisible(showStatusBar);
       phoneBar.setVisibility(showStatusBar);
       phoneBar.getElement().getStyle().setOpacity(PHONEBAR_OPACITY_NORMAL);
+      
       // Clear any positioning adjustments - return to normal flow
       responsivePanel.getElement().getStyle().clearProperty("position");
       responsivePanel.getElement().getStyle().clearProperty("top");
