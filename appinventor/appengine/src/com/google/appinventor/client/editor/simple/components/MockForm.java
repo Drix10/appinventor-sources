@@ -598,10 +598,14 @@ public final class MockForm extends MockDesignerRoot implements DesignerRootComp
       } else {
         usableScreenWidth = screenWidth - navigationBar.getHeight();
       }
-      usableScreenHeight = screenHeight - phoneBar.getHeight() - titleBar.getHeight();
+      // Only subtract phoneBar height if it's actually visible
+      int phoneBarHeight = (phoneBar != null && phoneBar.isVisible()) ? phoneBar.getHeight() : 0;
+      usableScreenHeight = screenHeight - phoneBarHeight - titleBar.getHeight();
     } else {
       usableScreenWidth = screenWidth;
-      usableScreenHeight = screenHeight - phoneBar.getHeight() - titleBar.getHeight() - navigationBar.getHeight();
+      // Only subtract phoneBar height if it's actually visible
+      int phoneBarHeight = (phoneBar != null && phoneBar.isVisible()) ? phoneBar.getHeight() : 0;
+      usableScreenHeight = screenHeight - phoneBarHeight - titleBar.getHeight() - navigationBar.getHeight();
     }
     rootPanel.setPixelSize(usableScreenWidth, usableScreenHeight);
     // This margin is to ensure the mockform aligns to the left when there is space for a scrollbar
